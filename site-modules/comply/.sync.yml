@@ -1,0 +1,88 @@
+---
+.gitignore:
+  required:
+    - ---.project
+    - /volumes
+    - '/.vagrant'
+    - '/Vagrantfile'
+
+.gitlab-ci.yml:
+  unmanaged: true
+
+.pdkignore:
+  paths:
+    - /data
+    - /plans/demo_*.pp
+    - /plans/customer/demo_*.pp
+    - /plans/utils/redeploy.pp
+
+.rubocop.yml:
+  default_configs:
+    inherit_from: .rubocop_todo.yml
+
+.travis.yml:
+  unmanaged: true
+
+appveyor.yml:
+  unmanaged: true
+
+Gemfile:
+  optional:
+    ':development':
+      - gem: 'github_changelog_generator'
+        git: 'https://github.com/skywinder/github-changelog-generator'
+        ref: '20ee04ba1234e9e83eb2ffb5056e23d641c7a018'
+        condition: "Gem::Version.new(RUBY_VERSION.dup) >= Gem::Version.new('2.2.2')"
+      - gem: 'pdk'
+        version: '~> 1.17'
+      - gem: 'webmock'
+
+Rakefile:
+  requires:
+    - 'puppet-lint/tasks/puppet-lint'
+  extras:
+    - |
+      require 'rspec/core/rake_task'
+      namespace :comply do
+        RSpec::Core::RakeTask.new(:integration) do |t|
+          t.pattern = 'spec/acceptance/**{,/*/**}/*_spec.rb'
+          t.rspec_opts = "--tag integration"
+        end
+      end
+
+      desc 'Extend the life of all inventory machines to 167 Hours'
+      task(:extend_vm_life) do
+        require 'open3'
+        stdout, stderr, status = Open3.capture3("grep --extended --only-matching 'vmpooler_token: .*' ${HOME}/.fog | awk -F ' ' '{print $2}'")
+        vmpooler_token = stdout.strip
+        puts "VMPooler Token = #{vmpooler_token}"
+        # get a list of vm's
+        require 'puppet_litmus'
+        inventory_hash = inventory_hash_from_inventory_file
+        vms = find_targets(inventory_hash, nil)
+        vms.each do |vm|
+          vmshortname = vm.split('.')[0]
+          stdout, _stderr, _status = Open3.capture3("curl -s --url http://vmpooler.delivery.puppetlabs.net/api/v1/vm/#{vmshortname} -H X-AUTH-TOKEN:#{vmpooler_token}")
+          vmdetails = JSON.parse(stdout)
+
+          currentlife = vmdetails[vmshortname]['lifetime']
+          newlife = 168 - currentlife
+
+          curl_command = "curl -X PUT -d '{\"lifetime\":\"#{newlife}\"}' --url http://vcloud.delivery.puppetlabs.net/vm/#{vmshortname} -H X-AUTH-TOKEN:#{vmpooler_token}"
+          stdout, stderr, status = Open3.capture3(curl_command)
+          if JSON.parse(stdout)['ok']
+            puts "#{vm} extended"
+          else
+            puts "#{vm} #{JSON.parse(stdout)['failure']}"
+          end
+        end
+      end
+
+spec/default_facts.yml:
+  extra_facts:
+    archive_windir: 'C:\ProgramData\staging'
+    choco_install_path: 'C:\ProgramData\chocolatey'
+
+spec/spec_helper.rb:
+  mock_with: ':rspec'
+  coverage_report: true

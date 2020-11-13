@@ -1,0 +1,114 @@
+name: "release-helper"
+
+on:
+  push:
+    branches:
+      - release_prep
+
+jobs: 
+  CheckTests:
+    runs-on: self-hosted
+    steps:
+    - name: Checkout comply
+      uses: actions/checkout@master
+
+      # Wait for all the checks to pass before going on
+    - name: Wait for unit tests
+      uses: fountainhead/action-wait-for-check@v1.0.0
+      id: unit-tests
+      with:
+        token: ${{ secrets.COMPLY_PR_TOKEN }}
+        checkName: Travis CI - Pull Request
+        timeoutSeconds: 3600
+        intervalSeconds: 60
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    - name: Wait for integration tests
+      uses: fountainhead/action-wait-for-check@v1.0.0
+      id: integration-tests
+      with:
+        token: ${{ secrets.COMPLY_PR_TOKEN }}
+        checkName: ComplyIntegration
+        timeoutSeconds: 3600
+        intervalSeconds: 60
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    - name: Wait for docker tests
+      uses: fountainhead/action-wait-for-check@v1.0.0
+      id: docker-tests
+      with:
+        token: ${{ secrets.COMPLY_PR_TOKEN }}
+        checkName: LitmusAcceptanceDocker
+        timeoutSeconds: 3600
+        intervalSeconds: 60
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    - name: Wait for acceptance tests
+      uses: fountainhead/action-wait-for-check@v1.0.0
+      id: acceptance-tests
+      with:
+        token: ${{ secrets.COMPLY_PR_TOKEN }}
+        checkName: LitmusAcceptance (2.5.x, ~> 6.0, release_checks, puppet6)
+        timeoutSeconds: 3600
+        intervalSeconds: 60
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    - name: Fail tests
+      if: steps.unit-tests.outputs.conclusion == 'failure' ||
+          steps.integration-tests.outputs.conclusion == 'failure' ||
+          steps.docker-tests.outputs.conclusion == 'failure' ||
+          steps.acceptance-tests.outputs.conclusion == 'failure'
+      run: |
+        echo One or more tests have failed, bailing out.
+        exit 1
+    
+  Release:
+    runs-on: self-hosted
+    needs: CheckTests
+    steps:
+    - name: Run dependency and symlink checker
+      run: |
+          bundle install
+          gem install dependency_checker
+          dependency-checker metadata.json
+          bundle exec rake check:symlinks
+
+      # Pull all the docker images to be tar'd up and uploaded
+    - name: Pull and tar docker images
+      run: |
+        docker pull artifactory.delivery.puppetlabs.net/compliance/comply-ui:latest
+        docker pull artifactory.delivery.puppetlabs.net/compliance/postgres:11-alpine
+        docker pull artifactory.delivery.puppetlabs.net/compliance/scarp:latest
+        docker pull artifactory.delivery.puppetlabs.net/compliance/graphql-engine:v1.3.0
+        docker image save artifactory.delivery.puppetlabs.net/compliance/comply-ui:latest artifactory.delivery.puppetlabs.net/compliance/postgres:11-alpine artifactory.delivery.puppetlabs.net/compliance/scarp:latest artifactory.delivery.puppetlabs.net/compliance/graphql-engine:v1.3.0 > comply-stack.tar
+
+      # Build so that the module can be uploaded
+    - name: Build module
+      run: |
+        gem install bundler
+        bundle install --path .bundle/gems --jobs 4 --retry 3
+        bundle exec rake spec_prep
+        bundle exec pdk build module --force
+
+      # Will read metadata.json for the version and set that to latest
+    - name: Set latest version
+      run: |
+        echo "::set-env name=VERSION::$(jq -r '.version' metadata.json)"
+
+      # Packages images, image helper and module and uploads the file to artifactory as the version number
+      # Also updates latest version number  
+    - name: Release images
+      run: |
+        echo ${{ env.VERSION }} > latest
+        mkdir ${{ env.VERSION }}
+        mv comply-stack.tar files/image_helper.sh pkg/* ${{ env.VERSION }}
+        zip -r ${{ env.VERSION }}.zip ${{ env.VERSION }}/
+        curl -H "X-Explode-Arhive:true" -u${{ secrets.artifactory_creds }} -T ${{ env.VERSION }}.zip "https://artifactory.delivery.puppetlabs.net/artifactory/generic/compliance/comply/comply-${{ env.VERSION }}.zip"
+        curl -u${{ secrets.artifactory_creds }} -T latest "https://artifactory.delivery.puppetlabs.net/artifactory/generic/compliance/comply/latest"
+        echo "Artifacts uploaded!"
+
+    - name: Delete images
+      run: |
+        docker image rm artifactory.delivery.puppetlabs.net/compliance/comply-ui artifactory.delivery.puppetlabs.net/compliance/postgres:11-alpine artifactory.delivery.puppetlabs.net/compliance/scarp artifactory.delivery.puppetlabs.net/compliance/graphql-engine:v1.3.0
+
+

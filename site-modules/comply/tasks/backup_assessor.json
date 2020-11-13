@@ -1,0 +1,14 @@
+{
+  "puppet_task_version": 1,
+  "supports_noop": false,
+  "description": "Backup operations for the assessor, used for upgrades.",
+  "parameters": {
+    "operation": {
+      "description": "Allows create / delete / restore backups of the assessor.",
+      "type": "Enum[create,delete,restore]",
+      "default": "create"
+    }
+  },
+  "files": ["ruby_task_helper/files/task_helper.rb", "comply/lib/task_helper.rb"],
+  "input_method": "stdin"
+}

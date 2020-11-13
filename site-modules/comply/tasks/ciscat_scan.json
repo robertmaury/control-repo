@@ -1,0 +1,38 @@
+{
+  "puppet_task_version": 1,
+  "supports_noop": false,
+  "description": "Run a ciscat scan and upload to scarp",
+  "parameters": {
+    "benchmark": {
+      "description": "Name of the benchmark file to run with the scan. Mutually exclusive with scan_hash.",
+      "type": "Optional[String[1]]"
+    },
+    "comply_server": {
+      "description": "Name of the FQDB comply server to upload to. NB passing 'nil' will prevent the upload",
+      "type": "String[1]"
+    },
+    "comply_port": {
+      "description": "Port used from comply server.",
+      "type": "String[1]"
+    },
+    "profile": {
+      "description": "Name of the profile to run with the scan. This will use the default profile for that benchmark, if not specified.",
+      "type": "Optional[String[1]]"
+    },
+    "scan_hash": {
+      "description": "JSON struct in string format of benchmarks/profiles and their machine names. Mutually exclusive with scan_hash.",
+      "type": "Optional[String[1]]"
+    },
+    "custom_profile_id": {
+      "description": "A given custom_profile_id to be used for scans to have a custom profile applied.",
+      "type": "Optional[Integer[1]]"
+    },
+    "scan_type": {
+      "description": "The type of scan to be performed, adhoc or desired.",
+      "type": "Optional[Enum['adhoc','desired']]",
+      "default": "adhoc"
+    }
+  },
+  "files": ["ruby_task_helper/files/task_helper.rb", "comply/lib/task_helper.rb"],
+  "input_method": "stdin"
+}

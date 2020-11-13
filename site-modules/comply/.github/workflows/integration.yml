@@ -1,0 +1,46 @@
+name: "integration"
+
+on: [pull_request]
+
+jobs:
+  ComplyIntegration:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        lfs: 'true'
+    - name: checkoutLFS
+      uses: actions/checkout@v2
+    - run: git lfs pull
+    - name: Build
+      run: |
+        gem install bundler
+        bundle install --path .bundle/gems --jobs 4 --retry 3
+        bundle exec rake spec_prep
+    - name: Provision and setup
+      run: |
+        export LANG=en_US.UTF-8
+        export LANGUAGE=en_US:en
+        bundle exec bolt --modulepath spec/fixtures/modules plan run comply::demo_01_provision_machines
+        bundle exec bolt --modulepath spec/fixtures/modules -i ./inventory.yaml plan run comply::demo_02_pe_server_setup
+        bundle exec bolt --modulepath spec/fixtures/modules -i ./inventory.yaml plan run comply::demo_03_puppet_agents_setup
+        # if we are on the release branch use latest, use master otherwise
+        if [ `git rev-parse --abbrev-ref HEAD` == "release" ]; then
+          echo "using tag 'latest' for scarp & comply_ui images"
+          export tag=latest
+        else
+          echo "using tag 'master' for scarp & comply_ui images"
+          export tag=master
+        fi
+        bundle exec bolt --modulepath spec/fixtures/modules -i ./inventory.yaml plan run comply::demo_04_comply_stack_setup image_version=$tag
+    - name: Inventory
+      run: |
+        cat ./inventory.yaml
+    - name: Run tests
+      run: |
+        env
+        bundle exec rake comply:integration
+    - name: Tidy up
+      if: always()
+      run: |
+        bundle exec rake litmus:tear_down
