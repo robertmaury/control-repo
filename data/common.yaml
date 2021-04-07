@@ -25,6 +25,8 @@ puppet_enterprise::profile::agent::package_inventory_enabled: true
 # Redis
 profile::app::redis::bind: 127.0.0.1
 
+secure_linux_cis::rules::ensure_bootloader_password_is_set::enforced: false
+
 ##
 # Sample Website
 profile::app::sample_website::linux::enable_monitoring: false
