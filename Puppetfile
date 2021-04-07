@@ -119,6 +119,7 @@ mod 'tse-time', '1.0.1'
 mod 'tse-winntp', '1.0.1'
 #mod 'yelp-uchiwa', '2.1.0' # uchiwa is EOL in 2019
 mod 'fervid-secure_linux_cis', '3.0.0'
+mod 'camptocamp-kmod', '2.5.0'
 
 # Re-added 'puppet-staging' module to enable the existing CloudShop app code to work, 
 # as it provides a good demo for the SQLServer module (a popular customer ask).
