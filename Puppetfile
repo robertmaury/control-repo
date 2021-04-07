@@ -118,7 +118,7 @@ mod 'trlinkin-domain_membership', '1.1.2'
 mod 'tse-time', '1.0.1'
 mod 'tse-winntp', '1.0.1'
 #mod 'yelp-uchiwa', '2.1.0' # uchiwa is EOL in 2019
-mod 'fervid-secure_linux_cis', '3.0.0'
+mod 'fervid-secure_linux_cis', :latest
 mod 'camptocamp-kmod', '2.5.0'
 mod 'herculesteam-augeasproviders_sysctl', '2.6.0'
 
