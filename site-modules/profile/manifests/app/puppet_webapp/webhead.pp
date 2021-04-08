@@ -3,7 +3,7 @@ class profile::app::puppet_webapp::webhead (
   $app_version = '0.1.12',
   $dist_file   = "https://github.com/ipcrm/puppet_webapp/releases/download/${app_version}/puppet_webapp-${app_version}.tar.gz",
   $vhost_name  = $::fqdn,
-  $vhost_port  = '8008',
+  $vhost_port  = '8080',
   $doc_root    = '/var/www/flask',
   $app_env     = pick_default($::appenv,'dev')
 ) {
